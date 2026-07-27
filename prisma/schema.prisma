@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  config   TenantConfig?
+  sessions ConversationSession[]
+  messages MessageLog[]
+}
+
+model TenantConfig {
+  id                  String   @id @default(cuid())
+  tenantId            String   @unique
+  evolutionInstance   String   @unique
+  activeModels        String[] @default(["menu"])
+  defaultModel        String   @default("menu")
+  menuFlow            Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([evolutionInstance])
+}
+
+model ConversationSession {
+  id        String   @id @default(cuid())
+  tenantId  String
+  phone     String
+  model     String
+  state     Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, phone])
+  @@index([tenantId, updatedAt])
+}
+
+model MessageLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  phone     String
+  direction String
+  body      String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([phone, createdAt])
+}
