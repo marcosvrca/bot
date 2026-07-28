@@ -78,6 +78,18 @@ export class MessageRouter {
       };
     }
 
+    const switchTo = resolveModelSwitch(params.message.text, config.activeModels);
+    if (switchTo) {
+      session = {
+        tenantId: tenant.id,
+        phone: params.message.phone,
+        model: switchTo,
+        state: {},
+      };
+      await this.sessions.save(session);
+      params.message = { ...params.message, text: "menu" };
+    }
+
     const modelId = (session.model as BotModelId) || defaultModel;
     if (!this.registry.has(modelId) || !config.activeModels.includes(modelId)) {
       session.model = defaultModel;
@@ -117,4 +129,29 @@ export class MessageRouter {
       });
     }
   }
+}
+
+function resolveModelSwitch(text: string, activeModels: string[]): BotModelId | null {
+  const normalized = text.trim().toLowerCase();
+  const aliases: Record<string, BotModelId> = {
+    "modelo menu": "menu",
+    "bot menu": "menu",
+    "/menu": "menu",
+    "modelo agenda": "scheduling",
+    "modelo agendamento": "scheduling",
+    "bot agenda": "scheduling",
+    "/agenda": "scheduling",
+    "/agendamento": "scheduling",
+    "modelo clinica": "clinic",
+    "modelo clínica": "clinic",
+    "bot clinica": "clinic",
+    "bot clínica": "clinic",
+    "/clinica": "clinic",
+    "/clínica": "clinic",
+  };
+  const target = aliases[normalized];
+  if (!target || !activeModels.includes(target)) {
+    return null;
+  }
+  return target;
 }

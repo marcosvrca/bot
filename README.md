@@ -1,6 +1,6 @@
 # Plataforma de Bots WhatsApp (Evolution API)
 
-Bot modular, seguro e pronto para evolução multi-cliente. A v1 entrega o **Modelo Menu (A)** com núcleo preparado para Agendamento, Leads, Catálogo e IA.
+Bot modular, seguro e pronto para evolução multi-cliente. Modelos prontos: **Menu (A)** e **Agenda (B)**. Núcleo preparado para Leads, Catálogo e IA.
 
 ## Stack
 
@@ -76,10 +76,25 @@ curl -X POST "http://localhost:8080/webhook/set/demo" \
 
 ## Testar o Modelo Menu
 
-1. Envie qualquer mensagem para o número conectado
+1. Envie `modelo menu`
 2. O bot responde com o menu
 3. Digite `1`, `2` ou `3`
 4. Digite `menu` para recomeçar ou `sair` para encerrar a sessão
+
+## Testar o Modelo Clínica (psicologia)
+
+Com a API em `../clinica-psicologia` rodando (`npm run dev` na porta 4000):
+
+1. Envie `modelo clinica`
+2. `1` agendar → serviço → psicólogo → horário livre → nome → confirmar
+3. `2` listar consultas
+4. `3` cancelar / `4` remarcar
+
+Troca rápida:
+
+- `modelo menu`
+- `modelo agenda`
+- `modelo clinica`
 
 ## Segurança (v1)
 

@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: bot_secret
       POSTGRES_DB: bot
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -31,7 +31,7 @@ services:
       retries: 10
 
   evolution-api:
-    image: atendai/evolution-api:v2.2.3
+    image: evoapicloud/evolution-api:v2.3.1
     restart: unless-stopped
     depends_on:
       postgres:

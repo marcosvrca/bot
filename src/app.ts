@@ -11,6 +11,10 @@ import { SessionStore } from "./core/session/session-store.js";
 import { MessageRouter } from "./core/router/message-router.js";
 import { ModelRegistry } from "./models/registry.js";
 import { MenuModel } from "./models/menu/menu.model.js";
+import { SchedulingModel } from "./models/scheduling/scheduling.model.js";
+import { startReminderWorker } from "./models/scheduling/reminder.worker.js";
+import { ClinicHttpClient } from "./models/clinic/clinic.client.js";
+import { ClinicModel } from "./models/clinic/clinic.model.js";
 import { TenantService } from "./tenants/tenant-service.js";
 import { registerRoutes } from "./http/routes.js";
 
@@ -34,6 +38,8 @@ export async function startApp(): Promise<AppRuntime> {
 
   const registry = new ModelRegistry();
   registry.register(new MenuModel());
+  registry.register(new SchedulingModel(prisma));
+  registry.register(new ClinicModel(new ClinicHttpClient()));
 
   const router = new MessageRouter(
     tenants,
@@ -51,6 +57,13 @@ export async function startApp(): Promise<AppRuntime> {
     logger,
   });
 
+  const reminders = startReminderWorker({
+    prisma,
+    outbound,
+    logger,
+    intervalMs: env().REMINDER_POLL_MS,
+  });
+
   const app = Fastify({
     logger: false,
     trustProxy: true,
@@ -65,6 +78,7 @@ export async function startApp(): Promise<AppRuntime> {
 
   const close = async () => {
     logger.info("app.shutting_down");
+    reminders.stop();
     await worker.close();
     await inboundQueue.close();
     await app.close();

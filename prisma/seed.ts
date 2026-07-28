@@ -6,6 +6,8 @@ const prisma = new PrismaClient();
 async function main() {
   const slug = process.env.DEMO_TENANT_SLUG ?? "demo";
   const instance = process.env.DEMO_EVOLUTION_INSTANCE ?? "demo";
+  const defaultModel = process.env.DEMO_DEFAULT_MODEL ?? "clinic";
+  const activeModels = ["menu", "scheduling", "clinic"];
 
   const tenant = await prisma.tenant.upsert({
     where: { slug },
@@ -16,8 +18,8 @@ async function main() {
       config: {
         create: {
           evolutionInstance: instance,
-          activeModels: ["menu"],
-          defaultModel: "menu",
+          activeModels,
+          defaultModel,
           menuFlow: defaultMenuFlow,
         },
       },
@@ -28,14 +30,14 @@ async function main() {
         upsert: {
           create: {
             evolutionInstance: instance,
-            activeModels: ["menu"],
-            defaultModel: "menu",
+            activeModels,
+            defaultModel,
             menuFlow: defaultMenuFlow,
           },
           update: {
             evolutionInstance: instance,
-            activeModels: ["menu"],
-            defaultModel: "menu",
+            activeModels,
+            defaultModel,
             menuFlow: defaultMenuFlow,
           },
         },
@@ -44,7 +46,9 @@ async function main() {
     include: { config: true },
   });
 
-  console.log(`Seeded tenant "${tenant.slug}" -> instance "${instance}"`);
+  console.log(
+    `Seeded tenant "${tenant.slug}" -> instance "${instance}" (default: ${defaultModel})`,
+  );
 }
 
 main()

@@ -14,6 +14,10 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
   DEMO_TENANT_SLUG: z.string().default("demo"),
   DEMO_EVOLUTION_INSTANCE: z.string().default("demo"),
+  DEMO_DEFAULT_MODEL: z.enum(["menu", "scheduling", "clinic"]).default("menu"),
+  REMINDER_POLL_MS: z.coerce.number().int().positive().default(30_000),
+  CLINIC_API_URL: z.string().url().default("http://localhost:4000"),
+  CLINIC_API_KEY: z.string().min(8).default("clinic-api-key-change-me-16"),
 });
 
 export type Env = z.infer<typeof envSchema>;

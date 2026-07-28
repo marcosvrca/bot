@@ -1,6 +1,6 @@
 import type { OutboundMessage } from "../core/messaging/outbound-service.js";
 
-export type BotModelId = "menu" | "scheduling" | "leads" | "catalog" | "ai";
+export type BotModelId = "menu" | "scheduling" | "clinic" | "leads" | "catalog" | "ai";
 
 export type IncomingMessage = {
   phone: string;

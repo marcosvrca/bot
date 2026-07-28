@@ -17,6 +17,15 @@ export type ParsedInbound = {
   raw: unknown;
 };
 
+/** Only 1:1 chats — not groups, channels, status, broadcast lists. */
+export function isPrivateChatJid(remoteJid: string): boolean {
+  const jid = remoteJid.trim().toLowerCase();
+  if (!jid) {
+    return false;
+  }
+  return jid.endsWith("@s.whatsapp.net") || jid.endsWith("@c.us");
+}
+
 export function parseEvolutionWebhook(payload: unknown): ParsedInbound | null {
   const parsed = evolutionWebhookSchema.safeParse(payload);
   if (!parsed.success) {
@@ -40,7 +49,7 @@ export function parseEvolutionWebhook(payload: unknown): ParsedInbound | null {
   }
 
   const remoteJid = String(key.remoteJid ?? data.remoteJid ?? "");
-  if (!remoteJid || remoteJid.endsWith("@g.us")) {
+  if (!isPrivateChatJid(remoteJid)) {
     return null;
   }
 

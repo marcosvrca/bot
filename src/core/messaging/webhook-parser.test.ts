@@ -53,4 +53,37 @@ describe("parseEvolutionWebhook", () => {
       }),
     ).toBeNull();
   });
+
+  it("ignores channels, status and broadcast jids", () => {
+    const ignoredJids = [
+      "120363@g.us",
+      "1234567890@newsletter",
+      "status@broadcast",
+      "5511999999999@broadcast",
+    ];
+    for (const remoteJid of ignoredJids) {
+      expect(
+        parseEvolutionWebhook({
+          event: "messages.upsert",
+          instance: "demo",
+          data: {
+            key: { remoteJid, fromMe: false, id: "x" },
+            message: { conversation: "oi" },
+          },
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it("accepts legacy @c.us private chats", () => {
+    const inbound = parseEvolutionWebhook({
+      event: "messages.upsert",
+      instance: "demo",
+      data: {
+        key: { remoteJid: "5511999999999@c.us", fromMe: false, id: "3" },
+        message: { conversation: "oi" },
+      },
+    });
+    expect(inbound?.phone).toBe("5511999999999");
+  });
 });
