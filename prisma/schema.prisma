@@ -18,7 +18,8 @@ model Tenant {
   config       TenantConfig?
   sessions     ConversationSession[]
   messages     MessageLog[]
-  appointments Appointment[]
+  appointments       Appointment[]
+  googleAppointments GoogleAppointment[]
 }
 
 model TenantConfig {
@@ -82,6 +83,31 @@ model Appointment {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@index([tenantId, phone, status, scheduledAt])
+  @@index([status, remindAt, reminderSentAt])
+}
+
+/// Compromissos do modelo scheduling-google (espelhados no Google Calendar).
+model GoogleAppointment {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  phone               String
+  title               String
+  description         String?
+  scheduledAt         DateTime
+  endsAt              DateTime
+  remindBeforeMinutes Int       @default(60)
+  remindAt            DateTime
+  reminderSentAt      DateTime?
+  status              String    @default("scheduled")
+  googleEventId       String
+  googleCalendarId    String    @default("primary")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, googleEventId])
   @@index([tenantId, phone, status, scheduledAt])
   @@index([status, remindAt, reminderSentAt])
 }

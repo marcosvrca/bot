@@ -1,6 +1,6 @@
 # Plataforma de Bots WhatsApp (Evolution API)
 
-Bot modular, seguro e pronto para evolução multi-cliente. Modelos prontos: **Menu (A)** e **Agenda (B)**. Núcleo preparado para Leads, Catálogo e IA.
+Bot modular, seguro e pronto para evolução multi-cliente. Modelos prontos: **Menu**, **Agenda**, **Agenda + Google Calendar** e **Clínica**. Núcleo preparado para Leads, Catálogo e IA.
 
 ## Stack
 
@@ -94,7 +94,29 @@ Troca rápida:
 
 - `modelo menu`
 - `modelo agenda`
+- `modelo agenda google`
 - `modelo clinica`
+
+## Testar o Modelo Agenda + Google Calendar
+
+Modelo independente (`scheduling-google`): mesma UX da Agenda, mas cria/edita/cancela eventos no Google Calendar. Não altera o modelo `scheduling`.
+
+1. No [Google Cloud Console](https://console.cloud.google.com/): crie um projeto, ative **Google Calendar API**, crie credenciais OAuth (tipo Desktop ou Web).
+2. Gere um `refresh_token` com escopo `https://www.googleapis.com/auth/calendar.events`.
+3. Preencha no `.env`:
+
+```
+GOOGLE_CALENDAR_CLIENT_ID=...
+GOOGLE_CALENDAR_CLIENT_SECRET=...
+GOOGLE_CALENDAR_REFRESH_TOKEN=...
+GOOGLE_CALENDAR_ID=primary
+GOOGLE_CALENDAR_TIMEZONE=America/Sao_Paulo
+```
+
+4. `npx prisma db push` (tabela `GoogleAppointment`)
+5. No WhatsApp: `modelo agenda google` → `1` criar compromisso → confirmar
+
+Para um cliente só com esse bot: no `TenantConfig`, use `activeModels: ["scheduling-google"]` e `defaultModel: "scheduling-google"`.
 
 ## Segurança (v1)
 
@@ -112,7 +134,7 @@ src/
   infra/           # prisma, redis, queue
   http/            # health + webhook
   core/            # messaging, session, router, security
-  models/          # contrato + menu/
+  models/          # contrato + menu/ scheduling/ scheduling-google/ clinic/
   tenants/         # resolução multi-tenant
 prisma/            # schema + seed demo
 ```
@@ -140,4 +162,4 @@ prisma/            # schema + seed demo
 
 ## Próximos modelos
 
-Ordem prevista: Agendamento → Leads → Catálogo → IA → composição multi-modelo no mesmo bot (Menu como hub).
+Ordem prevista: Leads → Catálogo → IA → composição multi-modelo no mesmo bot (Menu como hub).

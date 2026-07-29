@@ -7,7 +7,7 @@ async function main() {
   const slug = process.env.DEMO_TENANT_SLUG ?? "demo";
   const instance = process.env.DEMO_EVOLUTION_INSTANCE ?? "demo";
   const defaultModel = process.env.DEMO_DEFAULT_MODEL ?? "clinic";
-  const activeModels = ["menu", "scheduling", "clinic"];
+  const activeModels = ["menu", "scheduling", "scheduling-google", "clinic"];
 
   const tenant = await prisma.tenant.upsert({
     where: { slug },

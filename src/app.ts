@@ -13,6 +13,8 @@ import { ModelRegistry } from "./models/registry.js";
 import { MenuModel } from "./models/menu/menu.model.js";
 import { SchedulingModel } from "./models/scheduling/scheduling.model.js";
 import { startReminderWorker } from "./models/scheduling/reminder.worker.js";
+import { SchedulingGoogleModel } from "./models/scheduling-google/scheduling-google.model.js";
+import { startGoogleReminderWorker } from "./models/scheduling-google/reminder.worker.js";
 import { ClinicHttpClient } from "./models/clinic/clinic.client.js";
 import { ClinicModel } from "./models/clinic/clinic.model.js";
 import { TenantService } from "./tenants/tenant-service.js";
@@ -39,6 +41,7 @@ export async function startApp(): Promise<AppRuntime> {
   const registry = new ModelRegistry();
   registry.register(new MenuModel());
   registry.register(new SchedulingModel(prisma));
+  registry.register(new SchedulingGoogleModel(prisma));
   registry.register(new ClinicModel(new ClinicHttpClient()));
 
   const router = new MessageRouter(
@@ -63,6 +66,12 @@ export async function startApp(): Promise<AppRuntime> {
     logger,
     intervalMs: env().REMINDER_POLL_MS,
   });
+  const googleReminders = startGoogleReminderWorker({
+    prisma,
+    outbound,
+    logger,
+    intervalMs: env().REMINDER_POLL_MS,
+  });
 
   const app = Fastify({
     logger: false,
@@ -79,6 +88,7 @@ export async function startApp(): Promise<AppRuntime> {
   const close = async () => {
     logger.info("app.shutting_down");
     reminders.stop();
+    googleReminders.stop();
     await worker.close();
     await inboundQueue.close();
     await app.close();

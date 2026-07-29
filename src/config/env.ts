@@ -14,10 +14,18 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
   DEMO_TENANT_SLUG: z.string().default("demo"),
   DEMO_EVOLUTION_INSTANCE: z.string().default("demo"),
-  DEMO_DEFAULT_MODEL: z.enum(["menu", "scheduling", "clinic"]).default("menu"),
+  DEMO_DEFAULT_MODEL: z
+    .enum(["menu", "scheduling", "scheduling-google", "clinic"])
+    .default("menu"),
   REMINDER_POLL_MS: z.coerce.number().int().positive().default(30_000),
   CLINIC_API_URL: z.string().url().default("http://localhost:4000"),
   CLINIC_API_KEY: z.string().min(8).default("clinic-api-key-change-me-16"),
+  /** OAuth do Google Calendar (modelo scheduling-google). Opcionais para o app subir sem esse bot. */
+  GOOGLE_CALENDAR_CLIENT_ID: z.string().default(""),
+  GOOGLE_CALENDAR_CLIENT_SECRET: z.string().default(""),
+  GOOGLE_CALENDAR_REFRESH_TOKEN: z.string().default(""),
+  GOOGLE_CALENDAR_ID: z.string().default("primary"),
+  GOOGLE_CALENDAR_TIMEZONE: z.string().default("America/Sao_Paulo"),
 });
 
 export type Env = z.infer<typeof envSchema>;
