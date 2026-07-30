@@ -1,4 +1,4 @@
-export type AppointmentStatus = "scheduled" | "cancelled" | "done";
+export type AppointmentStatus = "scheduled" | "confirmed" | "cancelled" | "done";
 
 export type AppointmentRecord = {
   id: string;

@@ -1,5 +1,5 @@
 import type { EvolutionClient } from "./evolution-client.js";
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import type { Logger } from "../../config/logger.js";
 
 export type OutboundMessage = {
@@ -18,6 +18,7 @@ export class OutboundService {
     instance: string;
     phone: string;
     messages: OutboundMessage[];
+    meta?: Prisma.InputJsonValue;
   }): Promise<void> {
     for (const message of params.messages) {
       await this.evolution.sendText({
@@ -32,6 +33,7 @@ export class OutboundService {
           phone: params.phone,
           direction: "outbound",
           body: message.text,
+          meta: params.meta,
         },
       });
 

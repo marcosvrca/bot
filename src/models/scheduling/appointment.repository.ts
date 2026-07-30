@@ -116,7 +116,7 @@ export class AppointmentRepository {
       where: {
         tenantId,
         phone,
-        status: "scheduled",
+        status: { in: ["scheduled", "confirmed"] },
         scheduledAt: { gte: new Date(now.getTime() - 24 * 60 * 60_000) },
       },
       orderBy: { scheduledAt: "asc" },
@@ -152,7 +152,7 @@ export class AppointmentRepository {
     const now = new Date();
     const rows = await this.prisma.appointment.findMany({
       where: {
-        status: "scheduled",
+        status: { in: ["scheduled", "confirmed"] },
         reminderSentAt: null,
         remindAt: { lte: now },
         scheduledAt: { gte: now },
@@ -197,8 +197,10 @@ export function formatReminderLabel(minutes: number): string {
 
 export function formatAppointment(a: AppointmentRecord, index?: number): string {
   const prefix = index !== undefined ? `*${index}.* ` : "";
+  const statusLabel =
+    a.status === "confirmed" ? " ✅ confirmado" : a.status === "scheduled" ? "" : ` (${a.status})`;
   const lines = [
-    `${prefix}*${a.title}*`,
+    `${prefix}*${a.title}*${statusLabel}`,
     `📅 ${formatDateTime(a.scheduledAt)}`,
     `🔔 ${formatReminderLabel(a.remindBeforeMinutes)}`,
   ];

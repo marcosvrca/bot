@@ -9,13 +9,21 @@ const envSchema = z.object({
   EVOLUTION_BASE_URL: z.string().url(),
   EVOLUTION_API_KEY: z.string().min(8),
   WEBHOOK_SECRET: z.string().min(16),
+  /**
+   * URL que a Evolution chama (deve ser alcançável pelo container).
+   * Em Docker Desktop (Windows/Mac): host.docker.internal
+   */
+  WEBHOOK_PUBLIC_URL: z
+    .string()
+    .url()
+    .default("http://host.docker.internal:3000/webhooks/evolution"),
   SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(1800),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(30),
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
   DEMO_TENANT_SLUG: z.string().default("demo"),
   DEMO_EVOLUTION_INSTANCE: z.string().default("demo"),
   DEMO_DEFAULT_MODEL: z
-    .enum(["menu", "scheduling", "scheduling-google", "clinic"])
+    .enum(["menu", "scheduling", "scheduling-google", "clinic", "leads", "catalog"])
     .default("menu"),
   REMINDER_POLL_MS: z.coerce.number().int().positive().default(30_000),
   CLINIC_API_URL: z.string().url().default("http://localhost:4000"),

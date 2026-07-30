@@ -7,6 +7,7 @@ export type BotModelId =
   | "clinic"
   | "leads"
   | "catalog"
+  | "owner"
   | "ai";
 
 export type IncomingMessage = {

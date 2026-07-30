@@ -5,8 +5,9 @@ import type { OutboundService } from "../messaging/outbound-service.js";
 import type { SessionStore } from "../session/session-store.js";
 import { RateLimiter } from "../security/guards.js";
 import type { ModelRegistry } from "../../models/registry.js";
-import type { BotModelId, IncomingMessage } from "../../models/types.js";
+import type { BotModelId, IncomingMessage, ModelResult } from "../../models/types.js";
 import type { TenantService } from "../../tenants/tenant-service.js";
+import { isOwnerPhone } from "../../models/owner/owner.model.js";
 
 export class MessageRouter {
   private readonly rateLimiter: RateLimiter;
@@ -78,6 +79,38 @@ export class MessageRouter {
       };
     }
 
+    // Atendimento humano pelo dashboard: só registra a mensagem, não responde com o bot.
+    if (session.state?.humanTakeover === true) {
+      this.logger.info(
+        { tenantId: tenant.id, phone: params.message.phone },
+        "router.human_takeover.skip_bot",
+      );
+      await this.sessions.save({
+        ...session,
+        state: {
+          ...session.state,
+          lastInboundAt: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    const owner = isOwnerPhone(config.ownerPhones, params.message.phone);
+    const lowerText = params.message.text.trim().toLowerCase();
+    if (
+      owner &&
+      ["admin", "painel", "/admin", "modelo admin", "modelo owner"].includes(lowerText)
+    ) {
+      session = {
+        tenantId: tenant.id,
+        phone: params.message.phone,
+        model: "owner",
+        state: {},
+      };
+      await this.sessions.save(session);
+      params.message = { ...params.message, text: "admin" };
+    }
+
     const switchTo = resolveModelSwitch(params.message.text, config.activeModels);
     if (switchTo) {
       session = {
@@ -90,12 +123,18 @@ export class MessageRouter {
       params.message = { ...params.message, text: "menu" };
     }
 
-    const modelId = (session.model as BotModelId) || defaultModel;
-    if (!this.registry.has(modelId) || !config.activeModels.includes(modelId)) {
+    let modelId = (session.model as BotModelId) || defaultModel;
+    if (modelId === "owner") {
+      if (!owner) {
+        modelId = defaultModel;
+        session.model = defaultModel;
+      }
+    } else if (!this.registry.has(modelId) || !config.activeModels.includes(modelId)) {
+      modelId = defaultModel;
       session.model = defaultModel;
     }
 
-    const model = this.registry.get(session.model as BotModelId);
+    const model = this.registry.get(modelId);
     const ctx = {
       tenantId: tenant.id,
       instance: config.evolutionInstance,
@@ -105,9 +144,16 @@ export class MessageRouter {
     };
 
     const isFresh = Object.keys(session.state).length === 0;
-    const result = isFresh
+    let result = isFresh
       ? await model.onStart(ctx, params.message)
       : await model.handleMessage(ctx, params.message);
+
+    result = await this.chainModelHandoff(result, model.id, config.activeModels, {
+      tenantId: tenant.id,
+      instance: config.evolutionInstance,
+      menuFlow: config.menuFlow,
+      message: params.message,
+    });
 
     if (result.endSession) {
       await this.sessions.clear(tenant.id, params.message.phone);
@@ -128,6 +174,59 @@ export class MessageRouter {
         messages: result.replies,
       });
     }
+  }
+
+  /** Quando um modelo pede `nextModel`, inicia o destino na mesma mensagem (Menu → Leads etc.). */
+  private async chainModelHandoff(
+    result: ModelResult,
+    currentModelId: BotModelId,
+    activeModels: string[],
+    params: {
+      tenantId: string;
+      instance: string;
+      menuFlow: unknown;
+      message: IncomingMessage;
+    },
+  ): Promise<ModelResult> {
+    const nextId = result.nextModel;
+    if (!nextId || nextId === currentModelId || result.endSession) {
+      return result;
+    }
+    if (!this.registry.has(nextId) || !activeModels.includes(nextId)) {
+      this.logger.warn(
+        { from: currentModelId, to: nextId, activeModels },
+        "router.handoff.model_unavailable",
+      );
+      return {
+        replies: [
+          ...result.replies,
+          {
+            text: "Este serviço não está disponível neste atendimento. Digite *menu* para outras opções.",
+          },
+        ],
+        nextState: {},
+        nextModel: "menu",
+      };
+    }
+
+    const next = this.registry.get(nextId);
+    const start = await next.onStart(
+      {
+        tenantId: params.tenantId,
+        instance: params.instance,
+        modelId: next.id,
+        sessionState: result.nextState,
+        menuFlow: params.menuFlow,
+      },
+      params.message,
+    );
+
+    return {
+      replies: [...result.replies, ...start.replies],
+      nextState: start.nextState,
+      nextModel: start.nextModel ?? nextId,
+      endSession: start.endSession,
+    };
   }
 }
 
@@ -153,6 +252,20 @@ function resolveModelSwitch(text: string, activeModels: string[]): BotModelId | 
     "bot clínica": "clinic",
     "/clinica": "clinic",
     "/clínica": "clinic",
+    "modelo leads": "leads",
+    "modelo lead": "leads",
+    "modelo crm": "leads",
+    "bot leads": "leads",
+    "bot crm": "leads",
+    "/leads": "leads",
+    "/crm": "leads",
+    "modelo catalogo": "catalog",
+    "modelo catálogo": "catalog",
+    "bot catalogo": "catalog",
+    "bot catálogo": "catalog",
+    "/catalogo": "catalog",
+    "/catálogo": "catalog",
+    "/catalog": "catalog",
   };
   const target = aliases[normalized];
   if (!target || !activeModels.includes(target)) {

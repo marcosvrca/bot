@@ -24,6 +24,16 @@ export type MenuNode =
       type: "handoff";
       title: string;
       body: string;
+    }
+  | {
+      id: string;
+      type: "model";
+      title: string;
+      body?: string;
+      /** BotModelId alvo (ex.: leads, scheduling). */
+      model: string;
+      /** Estado inicial repassado ao modelo (ex.: interesse pré-preenchido). */
+      seed?: Record<string, unknown>;
     };
 
 export type MenuFlow = {
@@ -42,7 +52,10 @@ export const defaultMenuFlow: MenuFlow = {
       options: [
         { key: "1", label: "Horários de atendimento", next: "hours" },
         { key: "2", label: "Nossos serviços", next: "services" },
-        { key: "3", label: "Falar com um atendente", next: "handoff" },
+        { key: "3", label: "Ver catálogo / preços", next: "goto_catalog" },
+        { key: "4", label: "Quero ser contactado", next: "lead_capture" },
+        { key: "5", label: "Agendar horário", next: "goto_scheduling" },
+        { key: "6", label: "Falar com um atendente", next: "handoff" },
       ],
     },
     hours: {
@@ -60,6 +73,8 @@ export const defaultMenuFlow: MenuFlow = {
       options: [
         { key: "1", label: "Consultoria", next: "service_consulting" },
         { key: "2", label: "Suporte técnico", next: "service_support" },
+        { key: "3", label: "Quero orçamento", next: "lead_quote" },
+        { key: "4", label: "Ver catálogo", next: "goto_catalog" },
         { key: "0", label: "Voltar ao menu", next: "root" },
       ],
     },
@@ -76,6 +91,36 @@ export const defaultMenuFlow: MenuFlow = {
       title: "Suporte técnico",
       body: "Nosso suporte resolve incidentes e tira dúvidas técnicas.",
       next: "services",
+    },
+    goto_catalog: {
+      id: "goto_catalog",
+      type: "model",
+      title: "Catálogo",
+      body: "Abrindo o catálogo de produtos e preços…",
+      model: "catalog",
+    },
+    lead_capture: {
+      id: "lead_capture",
+      type: "model",
+      title: "Contato",
+      body: "Perfeito! Vamos registrar seus dados para a equipe entrar em contato.",
+      model: "leads",
+      seed: { origin: "menu" },
+    },
+    lead_quote: {
+      id: "lead_quote",
+      type: "model",
+      title: "Orçamento",
+      body: "Certo! Vamos coletar seus dados para montar um orçamento.",
+      model: "leads",
+      seed: { origin: "menu", interest: "Orçamento" },
+    },
+    goto_scheduling: {
+      id: "goto_scheduling",
+      type: "model",
+      title: "Agenda",
+      body: "Abrindo a agenda…",
+      model: "scheduling",
     },
     handoff: {
       id: "handoff",

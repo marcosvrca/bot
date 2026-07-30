@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mvFlow Bots — Sistema</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/dashboard/styles.css" />
+  </head>
+  <body class="is-login">
+    <div class="bg-grid" aria-hidden="true"></div>
+
+    <section id="gate" class="gate" aria-label="Login">
+      <div class="gate-panel">
+        <p class="brand">mvFlow Bots</p>
+        <h1>Acesse seu sistema</h1>
+        <p class="lede">
+          Gerencie menus, catálogo, leads, agenda e conversas do WhatsApp em um só lugar.
+        </p>
+        <form id="login-form" class="gate-form">
+          <label>
+            Tenant (slug)
+            <input id="slug" name="slug" autocomplete="username" placeholder="demo" required />
+          </label>
+          <label>
+            Segredo da API
+            <input
+              id="secret"
+              name="secret"
+              type="password"
+              autocomplete="current-password"
+              placeholder="WEBHOOK_SECRET"
+              required
+            />
+          </label>
+          <button type="submit">Entrar</button>
+          <p id="gate-error" class="error" hidden></p>
+        </form>
+      </div>
+    </section>
+
+    <div id="app" class="app" hidden>
+      <div class="shell">
+        <header class="top">
+          <div>
+            <p class="brand">mvFlow Bots</p>
+            <h1 id="tenant-name">—</h1>
+            <p id="tenant-meta" class="muted"></p>
+          </div>
+          <div class="top-actions">
+            <span id="channel-badge" class="channel-badge">Canal: —</span>
+            <button type="button" id="channel-connect-btn" class="ghost">Conectar canal</button>
+            <button type="button" id="refresh-btn" class="ghost">Atualizar</button>
+            <button type="button" id="logout-btn" class="ghost">Sair</button>
+          </div>
+        </header>
+
+        <nav class="tabs" role="tablist">
+          <button type="button" class="tab active" data-tab="overview">Resumo</button>
+          <button type="button" class="tab" data-tab="messages">Conversas</button>
+          <button type="button" class="tab" data-tab="menu">Menu do bot</button>
+          <button type="button" class="tab" data-tab="catalog">Catálogo</button>
+          <button type="button" class="tab" data-tab="leads">Leads</button>
+          <button type="button" class="tab" data-tab="appointments">Agenda</button>
+          <button type="button" class="tab" data-tab="settings">Configurações</button>
+        </nav>
+
+        <p id="status-line" class="status" aria-live="polite"></p>
+
+        <main>
+          <section id="panel-overview" class="panel active">
+            <div class="metrics" id="metrics"></div>
+            <div class="split">
+              <div class="block">
+                <h2>Leads recentes</h2>
+                <div id="recent-leads" class="list"></div>
+              </div>
+              <div class="block">
+                <h2>Origem (7 dias)</h2>
+                <div id="origins" class="list"></div>
+              </div>
+            </div>
+          </section>
+
+          <section id="panel-messages" class="panel">
+            <div class="wa">
+              <aside class="wa-sidebar">
+                <div class="wa-sidebar-head">
+                  <strong>Conversas</strong>
+                  <input id="chat-search" type="search" placeholder="Buscar contato…" />
+                </div>
+                <div id="chat-list" class="wa-list"></div>
+              </aside>
+              <section class="wa-main">
+                <div id="chat-empty" class="wa-empty">
+                  <p>Selecione uma conversa para atender como no WhatsApp.</p>
+                </div>
+                <div id="chat-active" class="wa-active" hidden>
+                  <header class="wa-header">
+                    <div>
+                      <strong id="chat-title">—</strong>
+                      <p id="chat-subtitle" class="muted"></p>
+                    </div>
+                    <div class="wa-header-actions">
+                      <span id="chat-mode" class="wa-mode">Bot ativo</span>
+                      <button type="button" id="chat-takeover-btn" class="ghost">Assumir</button>
+                      <button type="button" id="chat-release-btn" class="ghost" hidden>
+                        Devolver ao bot
+                      </button>
+                    </div>
+                  </header>
+                  <div id="chat-thread" class="wa-thread" aria-live="polite"></div>
+                  <form id="chat-compose" class="wa-compose">
+                    <textarea
+                      id="chat-input"
+                      rows="1"
+                      placeholder="Digite uma mensagem… (Enter envia)"
+                      maxlength="4000"
+                    ></textarea>
+                    <button type="submit" id="chat-send">Enviar</button>
+                  </form>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <section id="panel-menu" class="panel">
+            <div class="manage-head">
+              <div>
+                <h2>Menu do bot</h2>
+                <p class="muted">Crie e edite os nós do atendimento (menus, mensagens, handoff e atalhos).</p>
+              </div>
+              <div class="manage-actions">
+                <button type="button" id="menu-add-btn" class="ghost">Novo nó</button>
+                <button type="button" id="menu-reset-btn" class="ghost">Restaurar padrão</button>
+                <button type="button" id="menu-save-btn">Salvar menu</button>
+              </div>
+            </div>
+            <div class="manage-grid">
+              <aside class="block">
+                <label class="field">
+                  Nó inicial
+                  <select id="menu-start"></select>
+                </label>
+                <div id="menu-node-list" class="node-list"></div>
+              </aside>
+              <div class="block">
+                <form id="menu-node-form" class="form-grid">
+                  <input type="hidden" id="menu-editing-id" />
+                  <label class="field">
+                    ID do nó
+                    <input id="menu-node-id" required placeholder="ex.: root" />
+                  </label>
+                  <label class="field">
+                    Tipo
+                    <select id="menu-node-type">
+                      <option value="menu">Menu (opções)</option>
+                      <option value="message">Mensagem</option>
+                      <option value="handoff">Atendente humano</option>
+                      <option value="model">Abrir outro bot</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    Título
+                    <input id="menu-node-title" required />
+                  </label>
+                  <label class="field span-2">
+                    Texto / corpo
+                    <textarea id="menu-node-body" rows="3"></textarea>
+                  </label>
+                  <div id="menu-fields-menu" class="span-2 form-grid">
+                    <label class="field span-2">
+                      Opções (uma por linha: chave | rótulo | próximo nó)
+                      <textarea
+                        id="menu-node-options"
+                        rows="5"
+                        placeholder="1 | Horários | hours"
+                      ></textarea>
+                    </label>
+                  </div>
+                  <div id="menu-fields-message" class="span-2 form-grid" hidden>
+                    <label class="field">
+                      Próximo nó
+                      <input id="menu-node-next" placeholder="root" />
+                    </label>
+                  </div>
+                  <div id="menu-fields-model" class="span-2 form-grid" hidden>
+                    <label class="field">
+                      Modelo
+                      <select id="menu-node-model">
+                        <option value="leads">leads</option>
+                        <option value="catalog">catalog</option>
+                        <option value="scheduling">scheduling</option>
+                        <option value="scheduling-google">scheduling-google</option>
+                        <option value="clinic">clinic</option>
+                        <option value="menu">menu</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      Seed JSON (opcional)
+                      <input id="menu-node-seed" placeholder='{"origin":"menu"}' />
+                    </label>
+                  </div>
+                  <div class="span-2 manage-actions">
+                    <button type="submit">Aplicar no editor</button>
+                    <button type="button" id="menu-delete-node-btn" class="ghost danger">
+                      Remover nó
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </section>
+
+          <section id="panel-catalog" class="panel">
+            <div class="manage-head">
+              <div>
+                <h2>Catálogo</h2>
+                <p class="muted">Crie, edite ou remova produtos e preços exibidos no WhatsApp.</p>
+              </div>
+              <button type="button" id="catalog-new-btn">Novo item</button>
+            </div>
+            <div class="manage-grid">
+              <div class="block">
+                <form id="catalog-form" class="form-grid">
+                  <input type="hidden" id="catalog-id" />
+                  <label class="field">
+                    Nome
+                    <input id="catalog-name" required />
+                  </label>
+                  <label class="field">
+                    Preço (R$)
+                    <input id="catalog-price" type="number" min="0" step="0.01" required />
+                  </label>
+                  <label class="field">
+                    Categoria
+                    <input id="catalog-category" />
+                  </label>
+                  <label class="field">
+                    SKU
+                    <input id="catalog-sku" />
+                  </label>
+                  <label class="field">
+                    Ordem
+                    <input id="catalog-sort" type="number" step="1" value="0" />
+                  </label>
+                  <label class="field check">
+                    <input id="catalog-active" type="checkbox" checked />
+                    Ativo no bot
+                  </label>
+                  <label class="field span-2">
+                    Descrição
+                    <textarea id="catalog-description" rows="3"></textarea>
+                  </label>
+                  <div class="span-2 manage-actions">
+                    <button type="submit" id="catalog-save-btn">Salvar item</button>
+                    <button type="button" id="catalog-cancel-btn" class="ghost">Limpar</button>
+                  </div>
+                </form>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Produto</th>
+                      <th>Categoria</th>
+                      <th>Preço</th>
+                      <th>Status</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="catalog-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="panel-leads" class="panel">
+            <div class="manage-head">
+              <div>
+                <h2>Leads / CRM</h2>
+                <p class="muted">Atualize status, anotações e remova cadastros.</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Contato</th>
+                    <th>Interesse</th>
+                    <th>Status</th>
+                    <th>Quando</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="leads-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="panel-appointments" class="panel">
+            <div class="manage-head">
+              <div>
+                <h2>Agenda</h2>
+                <p class="muted">Acompanhe e cancele compromissos futuros.</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Título</th>
+                    <th>Telefone</th>
+                    <th>Quando</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="appointments-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="panel-settings" class="panel">
+            <div class="manage-head">
+              <div>
+                <h2>Configurações</h2>
+                <p class="muted">Nome do cliente, modelos ativos e webhook de CRM.</p>
+              </div>
+            </div>
+            <form id="settings-form" class="block form-grid settings-form">
+              <label class="field">
+                Nome do tenant
+                <input id="settings-name" required />
+              </label>
+              <label class="field">
+                Instância Evolution
+                <input id="settings-instance" disabled />
+              </label>
+              <label class="field">
+                Modelo padrão
+                <select id="settings-default-model"></select>
+              </label>
+              <label class="field span-2">
+                Webhook de leads (opcional)
+                <input id="settings-webhook" type="url" placeholder="https://..." />
+              </label>
+              <label class="field span-2">
+                Celulares do dono (admin no WhatsApp)
+                <input
+                  id="settings-owners"
+                  placeholder="5511999999999, 5511888888888"
+                />
+                <span class="muted small">O dono digita *admin* no WhatsApp para gerenciar sem painel.</span>
+              </label>
+              <fieldset class="span-2 models-fieldset">
+                <legend>Modelos ativos</legend>
+                <div id="settings-models" class="checks"></div>
+              </fieldset>
+              <div class="span-2 manage-actions">
+                <button type="submit">Salvar configurações</button>
+              </div>
+            </form>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <dialog id="channel-dialog">
+      <div class="dialog-form channel-dialog">
+        <h3>Conectar WhatsApp</h3>
+        <p id="channel-dialog-status" class="muted">
+          Gerando QR Code pela Evolution API…
+        </p>
+        <div class="qr-wrap">
+          <img id="channel-qr" alt="QR Code WhatsApp" hidden />
+          <p id="channel-qr-empty" class="empty">Aguardando QR…</p>
+        </div>
+        <p class="muted small">
+          Abra o WhatsApp no celular → Aparelhos conectados → Conectar um aparelho e escaneie o código.
+        </p>
+        <div class="manage-actions">
+          <button type="button" id="channel-refresh-qr-btn">Atualizar QR</button>
+          <button type="button" id="channel-logout-btn" class="ghost danger">Desconectar</button>
+          <button type="button" id="channel-close-btn" class="ghost">Fechar</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="lead-dialog">
+      <form id="lead-form" method="dialog" class="form-grid dialog-form">
+        <h3>Editar lead</h3>
+        <input type="hidden" id="lead-id" />
+        <label class="field">
+          Nome
+          <input id="lead-name" required />
+        </label>
+        <label class="field">
+          Status
+          <select id="lead-status">
+            <option value="new">new</option>
+            <option value="contacted">contacted</option>
+            <option value="qualified">qualified</option>
+            <option value="won">won</option>
+            <option value="lost">lost</option>
+          </select>
+        </label>
+        <label class="field">
+          E-mail
+          <input id="lead-email" type="email" />
+        </label>
+        <label class="field">
+          Cidade
+          <input id="lead-city" />
+        </label>
+        <label class="field span-2">
+          Interesse
+          <input id="lead-interest" />
+        </label>
+        <label class="field span-2">
+          Notas
+          <textarea id="lead-notes" rows="3"></textarea>
+        </label>
+        <div class="span-2 manage-actions">
+          <button type="submit" value="save">Salvar</button>
+          <button type="button" id="lead-cancel-btn" class="ghost">Cancelar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/dashboard/app.js" type="module"></script>
+  </body>
+</html>

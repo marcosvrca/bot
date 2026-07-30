@@ -11,6 +11,7 @@ import {
   formatDateTime,
   formatReminderLabel,
 } from "./appointment.repository.js";
+import type { AppointmentRecord } from "./appointment.types.js";
 import { parseDateTime, parseReminderMinutes } from "./scheduling.parse.js";
 
 type Step =
@@ -26,7 +27,13 @@ type Step =
   | "edit_value"
   | "cancel_query"
   | "cancel_pick"
-  | "cancel_confirm";
+  | "cancel_confirm"
+  | "confirm_query"
+  | "confirm_pick"
+  | "confirm_confirm"
+  | "reschedule_query"
+  | "reschedule_pick"
+  | "reschedule_when";
 
 type Draft = {
   title?: string;
@@ -56,6 +63,8 @@ export class SchedulingModel implements BotModel {
     "report",
     "edit",
     "cancel",
+    "confirm",
+    "reschedule",
   ];
 
   private readonly repo: AppointmentRepository;
@@ -121,6 +130,18 @@ export class SchedulingModel implements BotModel {
         return this.stepPick(state, text, "cancel");
       case "cancel_confirm":
         return this.stepCancelConfirm(ctx, message.phone, state, lower);
+      case "confirm_query":
+        return this.stepQuery(ctx, message.phone, text, "confirm");
+      case "confirm_pick":
+        return this.stepPick(state, text, "confirm");
+      case "confirm_confirm":
+        return this.stepConfirmPresence(ctx, message.phone, state, lower);
+      case "reschedule_query":
+        return this.stepQuery(ctx, message.phone, text, "reschedule");
+      case "reschedule_pick":
+        return this.stepPick(state, text, "reschedule");
+      case "reschedule_when":
+        return this.stepRescheduleWhen(ctx, message.phone, state, text);
       case "idle":
       default:
         return this.routeIdle(ctx, message.phone, text, lower);
@@ -140,6 +161,8 @@ export class SchedulingModel implements BotModel {
             "*3* - Editar compromisso",
             "*4* - Cancelar compromisso",
             "*5* - Próximos 7 dias",
+            "*6* - Confirmar presença",
+            "*7* - Reagendar",
             "",
             "_Digite *ajuda* a qualquer momento. *sair* encerra._",
             "_Trocar de bot: *modelo menu*_ ",
@@ -187,6 +210,26 @@ export class SchedulingModel implements BotModel {
     }
     if (["5", "proximos", "próximos", "semana"].includes(lower)) {
       return this.listUpcomingWeek(ctx, phone);
+    }
+    if (["6", "confirmar", "confirmacao", "confirmação", "presenca", "presença"].includes(lower)) {
+      return {
+        replies: [
+          {
+            text: "Envie o *título* ou a *data/hora* do compromisso que deseja confirmar.",
+          },
+        ],
+        nextState: { step: "confirm_query" },
+      };
+    }
+    if (["7", "reagendar", "remarcar", "adiar"].includes(lower)) {
+      return {
+        replies: [
+          {
+            text: "Envie o *título* ou a *data/hora* do compromisso que deseja reagendar.",
+          },
+        ],
+        nextState: { step: "reschedule_query" },
+      };
     }
 
     // Atalho: se parecer data+texto, tenta fluxo rápido? Keep simple - show home
@@ -429,7 +472,7 @@ export class SchedulingModel implements BotModel {
     ctx: ModelContext,
     phone: string,
     text: string,
-    mode: "edit" | "cancel",
+    mode: "edit" | "cancel" | "confirm" | "reschedule",
   ): Promise<ModelResult> {
     const found = await this.repo.search(ctx.tenantId, phone, text);
     const all = found.length > 0 ? found : await this.repo.listActive(ctx.tenantId, phone);
@@ -443,38 +486,7 @@ export class SchedulingModel implements BotModel {
 
     if (found.length === 1) {
       const selected = found[0]!;
-      if (mode === "edit") {
-        return {
-          replies: [
-            {
-              text: [
-                `Encontrei:\n${formatAppointment(selected)}`,
-                "",
-                "O que deseja editar?",
-                "*1* Título  *2* Data/hora  *3* Lembrete  *4* Descrição",
-                "*0* Voltar",
-              ].join("\n"),
-            },
-          ],
-          nextState: {
-            step: "edit_field",
-            selectedId: selected.id,
-            candidates: [selected.id],
-          },
-        };
-      }
-      return {
-        replies: [
-          {
-            text: `Cancelar este compromisso?\n\n${formatAppointment(selected)}\n\n*sim* / *não*`,
-          },
-        ],
-        nextState: {
-          step: "cancel_confirm",
-          selectedId: selected.id,
-          candidates: [selected.id],
-        },
-      };
+      return this.afterSelectAppointment(selected.id, [selected.id], mode, selected);
     }
 
     const intro =
@@ -483,10 +495,19 @@ export class SchedulingModel implements BotModel {
         : `Encontrei *${found.length}* compromissos. Escolha o número:`;
 
     const body = all.map((a, i) => formatAppointment(a, i + 1)).join("\n\n");
+    const pickStep =
+      mode === "edit"
+        ? "edit_pick"
+        : mode === "cancel"
+          ? "cancel_pick"
+          : mode === "confirm"
+            ? "confirm_pick"
+            : "reschedule_pick";
+
     return {
       replies: [{ text: `${intro}\n\n${body}\n\n_Digite o número ou *0* para voltar._` }],
       nextState: {
-        step: mode === "edit" ? "edit_pick" : "cancel_pick",
+        step: pickStep,
         candidates: all.map((a) => a.id),
       },
     };
@@ -495,7 +516,7 @@ export class SchedulingModel implements BotModel {
   private stepPick(
     state: SchedulingState,
     text: string,
-    mode: "edit" | "cancel",
+    mode: "edit" | "cancel" | "confirm" | "reschedule",
   ): ModelResult {
     if (text.trim() === "0") {
       return this.home();
@@ -509,23 +530,153 @@ export class SchedulingModel implements BotModel {
       };
     }
     const selectedId = candidates[idx - 1]!;
+    return this.afterSelectAppointment(selectedId, candidates, mode);
+  }
+
+  private afterSelectAppointment(
+    selectedId: string,
+    candidates: string[],
+    mode: "edit" | "cancel" | "confirm" | "reschedule",
+    selected?: AppointmentRecord,
+  ): ModelResult {
     if (mode === "edit") {
       return {
         replies: [
           {
             text: [
+              selected ? `Encontrei:\n${formatAppointment(selected)}` : "Compromisso selecionado.",
+              "",
               "O que deseja editar?",
               "*1* Título  *2* Data/hora  *3* Lembrete  *4* Descrição",
               "*0* Voltar",
             ].join("\n"),
           },
         ],
-        nextState: { step: "edit_field", selectedId, candidates },
+        nextState: {
+          step: "edit_field",
+          selectedId,
+          candidates,
+        },
+      };
+    }
+    if (mode === "cancel") {
+      return {
+        replies: [
+          {
+            text: selected
+              ? `Cancelar este compromisso?\n\n${formatAppointment(selected)}\n\n*sim* / *não*`
+              : "Confirma o cancelamento? *sim* / *não*",
+          },
+        ],
+        nextState: {
+          step: "cancel_confirm",
+          selectedId,
+          candidates,
+        },
+      };
+    }
+    if (mode === "confirm") {
+      return {
+        replies: [
+          {
+            text: selected
+              ? `Confirmar presença neste compromisso?\n\n${formatAppointment(selected)}\n\n*sim* / *não*`
+              : "Confirma a presença? *sim* / *não*",
+          },
+        ],
+        nextState: {
+          step: "confirm_confirm",
+          selectedId,
+          candidates,
+        },
       };
     }
     return {
-      replies: [{ text: "Confirma o cancelamento? *sim* / *não*" }],
-      nextState: { step: "cancel_confirm", selectedId, candidates },
+      replies: [
+        {
+          text: selected
+            ? `Reagendar:\n${formatAppointment(selected)}\n\nNova *data/hora*?\nEx.: \`29/07/2026 10:00\`, \`amanhã 09:30\``
+            : "Nova *data/hora*? Ex.: `29/07/2026 10:00`",
+        },
+      ],
+      nextState: {
+        step: "reschedule_when",
+        selectedId,
+        candidates,
+      },
+    };
+  }
+
+  private async stepConfirmPresence(
+    ctx: ModelContext,
+    phone: string,
+    state: SchedulingState,
+    lower: string,
+  ): Promise<ModelResult> {
+    if (["nao", "não", "n"].includes(lower)) {
+      return {
+        replies: [{ text: "Confirmação cancelada." }],
+        nextState: { step: "idle" },
+      };
+    }
+    if (!["sim", "s", "ok", "confirmar"].includes(lower)) {
+      return {
+        replies: [{ text: "Responda *sim* ou *não*." }],
+        nextState: state,
+      };
+    }
+    if (!state.selectedId) {
+      return this.home();
+    }
+    const updated = await this.repo.update(state.selectedId, ctx.tenantId, phone, {
+      status: "confirmed",
+    });
+    return {
+      replies: [
+        {
+          text: updated
+            ? `✅ Presença confirmada!\n\n${formatAppointment(updated)}`
+            : "Presença confirmada.",
+        },
+      ],
+      nextState: { step: "idle" },
+    };
+  }
+
+  private async stepRescheduleWhen(
+    ctx: ModelContext,
+    phone: string,
+    state: SchedulingState,
+    text: string,
+  ): Promise<ModelResult> {
+    const id = state.selectedId;
+    if (!id) {
+      return this.home();
+    }
+    const parsed = parseDateTime(text);
+    if (!parsed || parsed.date.getTime() <= Date.now()) {
+      return {
+        replies: [
+          {
+            text: "Data/hora inválida ou no passado. Use `DD/MM/AAAA HH:MM`, `hoje 15:00` ou `amanhã 09:30`.",
+          },
+        ],
+        nextState: state,
+      };
+    }
+    const updated = await this.repo.update(id, ctx.tenantId, phone, {
+      scheduledAt: parsed.date,
+      status: "scheduled",
+    });
+    return {
+      replies: [
+        {
+          text: updated
+            ? `🔄 Reagendado!\n\n${formatAppointment(updated)}`
+            : "Compromisso reagendado.",
+        },
+      ],
+      nextState: { step: "idle" },
     };
   }
 

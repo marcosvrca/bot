@@ -15,11 +15,13 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  config       TenantConfig?
-  sessions     ConversationSession[]
-  messages     MessageLog[]
+  config             TenantConfig?
+  sessions           ConversationSession[]
+  messages           MessageLog[]
   appointments       Appointment[]
   googleAppointments GoogleAppointment[]
+  leads              Lead[]
+  catalogItems       CatalogItem[]
 }
 
 model TenantConfig {
@@ -29,12 +31,62 @@ model TenantConfig {
   activeModels        String[] @default(["menu"])
   defaultModel        String   @default("menu")
   menuFlow            Json?
+  /// Webhook opcional: POST JSON do lead criado (CRM, Sheets, Make, n8n…).
+  leadsWebhookUrl     String?
+  /// Celulares do dono (só dígitos). Podem gerenciar o bot pelo WhatsApp sem painel.
+  ownerPhones         String[] @default([])
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([evolutionInstance])
+}
+
+/// Lead capturado pelo modelo `leads` (CRM básico).
+model Lead {
+  id        String   @id @default(cuid())
+  tenantId  String
+  phone     String
+  name      String
+  email     String?
+  interest  String?
+  city      String?
+  origin    String   @default("whatsapp")
+  status    String   @default("new")
+  notes     String?
+  meta      Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, phone])
+  @@index([tenantId, status])
+}
+
+/// Item do catálogo (modelo `catalog`).
+model CatalogItem {
+  id          String   @id @default(cuid())
+  tenantId    String
+  sku         String?
+  name        String
+  description String?
+  /// Preço em centavos (BRL). Ex.: 48900 = R$ 489,00
+  priceCents  Int
+  category    String?
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  meta        Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, active, sortOrder])
+  @@index([tenantId, category])
+  @@index([tenantId, name])
 }
 
 model ConversationSession {

@@ -8,7 +8,8 @@ describe("menu handlers", () => {
     const root = getNode(defaultMenuFlow, "root");
     const text = renderNode(root);
     expect(text).toContain("*1* - Horários de atendimento");
-    expect(text).toContain("*3* - Falar com um atendente");
+    expect(text).toContain("*3* - Ver catálogo / preços");
+    expect(text).toContain("*6* - Falar com um atendente");
   });
 
   it("resolves option by key and label", () => {
@@ -57,6 +58,32 @@ describe("MenuModel", () => {
       { phone: "5511999999999", text: "menu", messageType: "conversation" },
     );
     expect(reset.nextState).toEqual({ nodeId: "root" });
+  });
+
+  it("hands off to catalog model", async () => {
+    const result = await model.handleMessage(
+      { ...ctx, sessionState: { nodeId: "root" } },
+      { phone: "5511999999999", text: "3", messageType: "conversation" },
+    );
+    expect(result.nextModel).toBe("catalog");
+  });
+
+  it("hands off to leads model", async () => {
+    const result = await model.handleMessage(
+      { ...ctx, sessionState: { nodeId: "root" } },
+      { phone: "5511999999999", text: "4", messageType: "conversation" },
+    );
+    expect(result.nextModel).toBe("leads");
+    expect(result.nextState).toMatchObject({ origin: "menu" });
+    expect(result.replies[0]?.text).toContain("registrar seus dados");
+  });
+
+  it("hands off to scheduling model", async () => {
+    const result = await model.handleMessage(
+      { ...ctx, sessionState: { nodeId: "root" } },
+      { phone: "5511999999999", text: "5", messageType: "conversation" },
+    );
+    expect(result.nextModel).toBe("scheduling");
   });
 
   it("ends session on sair", async () => {

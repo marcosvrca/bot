@@ -1,4 +1,4 @@
-import type { BotModel, IncomingMessage, ModelContext, ModelResult } from "../types.js";
+import type { BotModel, BotModelId, IncomingMessage, ModelContext, ModelResult } from "../types.js";
 import { defaultMenuFlow, parseMenuFlow } from "./menu.flows.js";
 import { getNode, renderNode, resolveOption } from "./menu.handlers.js";
 
@@ -11,7 +11,7 @@ const EXIT_COMMANDS = new Set(["sair", "exit", "cancelar", "encerrar"]);
 
 export class MenuModel implements BotModel {
   readonly id = "menu" as const;
-  readonly capabilities = ["menu", "faq-static", "handoff"];
+  readonly capabilities = ["menu", "faq-static", "handoff", "hub"];
 
   async onStart(ctx: ModelContext, _message: IncomingMessage): Promise<ModelResult> {
     const flow = parseMenuFlow(ctx.menuFlow ?? defaultMenuFlow);
@@ -62,6 +62,10 @@ export class MenuModel implements BotModel {
       return this.enterNode(flow, nextId);
     }
 
+    if (current.type === "model") {
+      return this.enterNode(flow, current.id);
+    }
+
     // handoff: stay until reset
     return {
       replies: [{ text: current.body }],
@@ -71,6 +75,18 @@ export class MenuModel implements BotModel {
 
   private enterNode(flow: ReturnType<typeof parseMenuFlow>, nodeId: string): ModelResult {
     const node = getNode(flow, nodeId);
+
+    if (node.type === "model") {
+      const bridge = node.body
+        ? [{ text: [`*${node.title}*`, node.body].join("\n") }]
+        : [];
+      return {
+        replies: bridge,
+        nextState: { ...(node.seed ?? {}) },
+        nextModel: node.model as BotModelId,
+      };
+    }
+
     return {
       replies: [{ text: renderNode(node) }],
       nextState: { nodeId: node.id },

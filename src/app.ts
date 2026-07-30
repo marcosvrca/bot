@@ -17,8 +17,12 @@ import { SchedulingGoogleModel } from "./models/scheduling-google/scheduling-goo
 import { startGoogleReminderWorker } from "./models/scheduling-google/reminder.worker.js";
 import { ClinicHttpClient } from "./models/clinic/clinic.client.js";
 import { ClinicModel } from "./models/clinic/clinic.model.js";
+import { LeadsModel } from "./models/leads/leads.model.js";
+import { CatalogModel } from "./models/catalog/catalog.model.js";
+import { OwnerModel } from "./models/owner/owner.model.js";
 import { TenantService } from "./tenants/tenant-service.js";
 import { registerRoutes } from "./http/routes.js";
+import { registerDashboardRoutes } from "./http/dashboard-routes.js";
 
 export type AppRuntime = {
   close: () => Promise<void>;
@@ -43,6 +47,9 @@ export async function startApp(): Promise<AppRuntime> {
   registry.register(new SchedulingModel(prisma));
   registry.register(new SchedulingGoogleModel(prisma));
   registry.register(new ClinicModel(new ClinicHttpClient()));
+  registry.register(new LeadsModel(prisma, logger));
+  registry.register(new CatalogModel(prisma));
+  registry.register(new OwnerModel(prisma));
 
   const router = new MessageRouter(
     tenants,
@@ -80,10 +87,11 @@ export async function startApp(): Promise<AppRuntime> {
   });
 
   await registerRoutes(app, { prisma, redis, inboundQueue, logger });
+  await registerDashboardRoutes(app, { prisma, outbound, sessions, evolution });
 
   const port = env().PORT;
   await app.listen({ port, host: "0.0.0.0" });
-  logger.info({ port, models: registry.list() }, "app.started");
+  logger.info({ port, models: registry.list(), dashboard: "/dashboard" }, "app.started");
 
   const close = async () => {
     logger.info("app.shutting_down");

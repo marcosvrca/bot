@@ -24,6 +24,14 @@ export function renderNode(node: MenuNode): string {
     return lines.join("\n");
   }
 
+  if (node.type === "model") {
+    const lines = [`*${node.title}*`];
+    if (node.body) {
+      lines.push(node.body);
+    }
+    return lines.join("\n");
+  }
+
   return [`*${node.title}*`, node.body].join("\n");
 }
 
